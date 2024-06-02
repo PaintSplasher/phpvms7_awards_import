@@ -79,41 +79,53 @@
 
     function step3() {
       global $conn;
-
+  
       $sql_trunca = "TRUNCATE TABLE phpvms7_user_awards";
       $conn->query($sql_trunca);
-
+  
       $sql_select = "SELECT id, awardid, pilotid, dateissued FROM phpvms_awardsgranted";
       $sql_insert = "INSERT INTO phpvms7_user_awards (id, award_id, user_id, created_at) VALUES (?, ?, ?, ?)";
       $stmt = $conn->prepare($sql_insert);
-
+  
       if (!$stmt) {
-        die("Prepare failed: " . $conn->error);
+          die("Prepare failed: " . $conn->error);
       }
-
+  
       $result = $conn->query($sql_select);
-
+  
       if ($result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-          if (preg_match("/^\d{2}\/\d{2}\/\d{2}$/", $row['dateissued'])) {
-            $timestamp = strtotime($row['dateissued']);
-          } elseif (preg_match("/^\d{4}-\d{2}-\d{2}$/", $row['dateissued'])) {
-            $timestamp = strtotime($row['dateissued']);
-          } else {
-            echo "Invalid date format: " . $row['dateissued'] . ". Data record skipped." . "<br>";
-            continue;
+          while ($row = $result->fetch_assoc()) {
+              if (preg_match("/^\d{2}\/\d{2}\/\d{2}$/", $row['dateissued'])) {
+                  $timestamp = strtotime($row['dateissued']);
+              } elseif (preg_match("/^\d{4}-\d{2}-\d{2}$/", $row['dateissued'])) {
+                  $timestamp = strtotime($row['dateissued']);
+              } else {
+                  echo "Invalid date format: " . $row['dateissued'] . ". Data record skipped." . "<br>";
+                  continue;
+              }
+  
+              $stmt->bind_param("iiis", $row['id'], $row['awardid'], $row['pilotid'], date('Y-m-d H:i:s', $timestamp));
+              $stmt->execute();
           }
-
-          $stmt->bind_param("iiis", $row['id'], $row['awardid'], $row['pilotid'], date('Y-m-d H:i:s', $timestamp));
-          $stmt->execute();
-        }
           echo "<b>Step3</b>: Data from table phpvms_awardsgranted successfully imported into table phpvms7_user_awards.<br><hr>";
       } else {
-        echo "<b>Step3</b>: No data found in table phpvms_awardsgranted.<br><hr>";
+          echo "<b>Step3</b>: No data found in table phpvms_awardsgranted.<br><hr>";
       }
-
+  
       $stmt->close();
-      $conn->close();
-    }
+  
+      $sql_update = "UPDATE phpvms7_user_awards ua
+                     JOIN phpvms7_users u
+                     ON ua.user_id = u.pilot_id
+                     SET ua.user_id = u.id";
 
-  ?>
+      if ($conn->query($sql_update) === TRUE) {
+          echo "<b>Step4</b>: User IDs in phpvms7_user_awards successfully updated.<br><hr>";
+      } else {
+          echo "<b>Step4</b>: Error updating User IDs in phpvms7_user_awards: " . $conn->error . "<br><hr>";
+      }
+  
+      $conn->close();
+  }
+
+?>
